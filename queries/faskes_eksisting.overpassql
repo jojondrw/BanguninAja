@@ -1,5 +1,5 @@
 /*
-  SiteScope — Query Fasilitas Kesehatan Eksisting
+  BanguninAja — Query Fasilitas Kesehatan Eksisting
   ------------------------------------------------
   Dipakai untuk profil "Rumah Sakit":
   cari wilayah yang JAUH dari faskes yang sudah ada (underserved area).

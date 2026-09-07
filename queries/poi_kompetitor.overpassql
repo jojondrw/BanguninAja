@@ -1,5 +1,5 @@
 /*
-  SiteScope — Query POI Kompetitor
+  BanguninAja — Query POI Kompetitor
   ---------------------------------
   CARA PAKAI:
   1. Buka https://overpass-turbo.eu/

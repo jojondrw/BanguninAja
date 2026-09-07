@@ -1,4 +1,4 @@
-# SiteScope
+# BanguninAja
 
 **Sistem Pendukung Keputusan Penentuan Lokasi Berbasis GIS**
 
@@ -65,7 +65,8 @@ Developer/investor · Analis lokasi · Konsultan properti · Admin data · Pemda
 
 ```
 sitescope/
-├── DATASETS.md          ← katalog sumber data + link download
+├── PANDUAN_DOWNLOAD.md  ← cara ambil datanya, langkah demi langkah
+├── DATASETS.md          ← katalog sumber data + link & lisensi
 ├── data/
 │   ├── raw/             hasil download mentah (tidak di-commit)
 │   ├── processed/       hasil olahan
@@ -84,11 +85,14 @@ sitescope/
 
 ## Mulai dari Mana
 
-**1. Install QGIS** (gratis) — [qgis.org/download](https://qgis.org/download/), pilih versi **LTR**.
+👉 **Ikuti [`PANDUAN_DOWNLOAD.md`](PANDUAN_DOWNLOAD.md)** — panduan langkah demi langkah beserta checklist tim.
 
-**2. Ambil data pertama** — buka [`DATASETS.md`](DATASETS.md), mulai dari bagian *"Mulai dari sini"*.
+Ringkasnya:
+1. Pasang **QGIS** — [qgis.org/download](https://qgis.org/download/), pilih versi **LTR**
+2. Ambil POI lewat [overpass-turbo.eu](https://overpass-turbo.eu/) — paling cepat, 5 menit
+3. Lanjut ke WorldPop, InaRISK, dan API Key BPS
 
-**3. Query POI tercepat** — buka [overpass-turbo.eu](https://overpass-turbo.eu/), paste isi [`queries/poi_kompetitor.overpassql`](queries/poi_kompetitor.overpassql), klik Run, Export sebagai GeoJSON.
+Daftar lengkap sumber data & lisensinya ada di [`DATASETS.md`](DATASETS.md).
 
 ---
 
