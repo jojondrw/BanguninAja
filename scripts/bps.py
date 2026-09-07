@@ -21,7 +21,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from urllib.parse import quote
+from html import unescape
 
 import requests
 
@@ -157,6 +157,11 @@ def cmd_ambil(domain: str, table_id: str) -> None:
 
     if not html:
         sys.exit("❌ Tabel kosong. Cek lagi table_id-nya.")
+
+    # BPS mengirim tabelnya dalam bentuk ter-escape (&lt;table&gt; dst),
+    # jadi harus dikembalikan dulu ke HTML asli sebelum bisa dibaca pandas.
+    if "&lt;" in html:
+        html = unescape(html)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 

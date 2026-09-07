@@ -156,6 +156,38 @@ Data zonasi **tidak tersedia dalam format terbuka yang bisa dibaca mesin**. Ini 
 
 ---
 
+## Metode: Mengukur Daya Beli per Kecamatan
+
+Daya beli adalah kriteria terpenting untuk profil **mall/retail** dan **hiburan/F&B**. Sistem mengukurnya dengan **indeks komposit** dari tiga sumber, bukan dari satu angka tunggal:
+
+| Komponen | Sumber | Bobot | Alasan |
+|----------|--------|-------|--------|
+| Intensitas cahaya malam | [VIIRS](https://developers.google.com/earth-engine/datasets/catalog/NOAA_VIIRS_DNB_MONTHLY_V1_VCMSLCFG) | 40% | Terang = aktivitas ekonomi tinggi. Resolusi 463 m, jauh lebih halus dari batas administrasi |
+| Kepadatan POI komersial | [OSM](https://overpass-turbo.eu/) | 40% | Banyak bank, kafe, minimarket = daya beli tinggi. Resolusi titik |
+| PDRB & indikator ekonomi | [BPS](https://webapi.bps.go.id/) | 20% | Jangkar kalibrasi tingkat kota |
+
+### Kenapa indeks komposit
+
+Angka pengeluaran per kapita BPS diterbitkan pada level kota — cocok sebagai jangkar, tapi terlalu kasar untuk membedakan antar-kecamatan. VIIRS dan kepadatan POI memberi variasi spasial yang dibutuhkan, lalu dikalibrasi ke angka BPS supaya tetap terhubung ke statistik resmi.
+
+Pendekatan ini adalah praktik standar di **location intelligence** — nightlight sudah lama dipakai sebagai proksi aktivitas ekonomi dalam riset pembangunan.
+
+### Cara hitungnya
+
+```
+1. Bagi wilayah studi jadi grid 500 × 500 m
+2. Tiap sel dapat:
+     - rata-rata radiance VIIRS      → normalisasi 0–1
+     - jumlah POI komersial (r=500m) → normalisasi 0–1
+3. indeks_daya_beli = 0.4·nightlight + 0.4·poi + 0.2·pdrb_kota
+4. Kalibrasi: rata-rata indeks per kota harus sejalan dengan
+   peringkat PDRB per kapita antar kota dari BPS
+```
+
+Hasilnya: peta daya beli beresolusi 500 m, bukan satu angka untuk seluruh kota.
+
+---
+
 ## Ringkasan Lisensi
 
 | Sumber | Lisensi | Boleh komersial? | Wajib atribusi? |
