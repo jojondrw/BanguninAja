@@ -131,21 +131,56 @@ Lalu masukkan URL REST service InaRISK. Cara ini lebih cepat kalau cuma mau liha
 4. Masuk ke menu **Profile → Applications → Add Application**
 5. Salin **API Key** yang muncul
 
-⚠️ **JANGAN commit API Key ke GitHub.** Simpan di file `.env` (sudah masuk `.gitignore`):
+### Simpan key-nya
+
+⚠️ **JANGAN commit API Key ke GitHub.**
+
+Salin `.env.example` jadi `.env` di folder utama proyek, lalu isi key-nya:
 
 ```
 BPS_API_KEY=key_kamu_disini
 ```
 
-### Pakai dari Python
+File `.env` sudah diblokir lewat `.gitignore`, jadi aman.
+
+### Ambil datanya
+
+Sudah ada skrip siap pakai di [`scripts/bps.py`](scripts/bps.py). Jalankan dari folder utama proyek.
+
+**Langkah 1 — cari kode wilayah:**
 
 ```bash
-pip install stadata
+python scripts/bps.py wilayah jakarta
 ```
 
-Package resmi dari BPS, lebih gampang daripada memanggil API mentah.
+Keluar daftar kode wilayah. Catat kode kota yang jadi studi kasus.
 
-Dokumentasi: [webapi.bps.go.id/documentation](https://webapi.bps.go.id/documentation/)
+**Langkah 2 — cari tabel yang dibutuhkan:**
+
+```bash
+python scripts/bps.py cari 3171 penduduk
+```
+
+Ganti `3171` dengan kode wilayahmu. Kata kunci yang berguna untuk proyek ini:
+
+| Kata kunci | Dapat apa |
+|-----------|-----------|
+| `penduduk` | Jumlah & kepadatan penduduk |
+| `pengeluaran` | Pengeluaran per kapita (proxy daya beli) |
+| `pdrb` | Produk domestik regional bruto |
+| `kemiskinan` | Persentase penduduk miskin |
+| `kesehatan` | Jumlah faskes |
+| `pendidikan` | Jumlah sekolah |
+
+**Langkah 3 — ambil tabelnya:**
+
+```bash
+python scripts/bps.py ambil 3171 123
+```
+
+Angka terakhir adalah `table_id` dari hasil langkah 2. Hasilnya otomatis tersimpan sebagai CSV di `data/raw/`.
+
+Dokumentasi API: [webapi.bps.go.id/documentation](https://webapi.bps.go.id/documentation/)
 
 ---
 
