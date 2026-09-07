@@ -50,3 +50,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Gambar hasil render boleh ikut, ukurannya kecil
+!reports/*.png
