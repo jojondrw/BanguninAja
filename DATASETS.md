@@ -15,7 +15,7 @@ Kolom **Status**:
 |----|------|--------|--------|
 | 1 | POI kompetitor | [Overpass Turbo](https://overpass-turbo.eu/) | 🟢 |
 | 2 | Kepadatan penduduk | [WorldPop Indonesia](https://hub.worldpop.org/geodata/summary?id=6376) | 🟢 |
-| 3 | Risiko bencana | [InaRISK BNPB](https://inarisk2.bnpb.go.id/portal/) | 🟢 |
+| 3 | Risiko bencana | `python scripts/ambil_inarisk.py` — [REST BNPB](https://gis.bnpb.go.id/server/rest/services/inarisk) | 🟢 |
 | 4 | Statistik wilayah | [WebAPI BPS](https://webapi.bps.go.id/developer/) | 🔑 |
 
 Empat ini sudah cukup untuk membuat mesin skoring pertama jalan.
