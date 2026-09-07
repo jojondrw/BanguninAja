@@ -1,0 +1,52 @@
+# ---- Data besar: JANGAN di-commit ----
+data/raw/*
+data/processed/*
+data/external/*
+!data/**/.gitkeep
+!data/**/README.md
+
+# Format geospasial (ukurannya besar)
+*.osm.pbf
+*.tif
+*.tiff
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.sbn
+*.sbx
+*.zip
+*.7z
+*.gz
+
+# GeoJSON kecil boleh di-commit, taruh di queries/output/
+# Kalau > 50 MB, jangan.
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+.python-version
+
+# ---- Rahasia ----
+.env
+*.key
+secrets.json
+config.local.*
+
+# ---- QGIS ----
+*.qgz~
+*.qgs~
+.qgis3/
+
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
