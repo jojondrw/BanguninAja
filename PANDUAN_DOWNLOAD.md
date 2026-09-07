@@ -1,249 +1,253 @@
 # Panduan Download Dataset
 
-Panduan langkah demi langkah untuk anggota tim. Kerjakan berurutan — makin ke bawah makin ribet.
+Ikuti urut dari atas. Setelah selesai, isi folder `data/` kamu akan **sama persis** dengan anggota tim lain.
 
-**Simpan semua hasil download ke folder `data/raw/`.**
+Total waktu: ~30 menit (sebagian besar cuma nunggu download).
 
-Aturan penamaan file:
+---
+
+## Checklist
+
+- [ ] 0. Pasang QGIS
+- [ ] 1. Siapkan Python
+- [ ] 2. POI kompetitor — Overpass *(manual)*
+- [ ] 3. Kepadatan penduduk — WorldPop *(manual)*
+- [ ] 4. Batas wilayah — GADM *(manual)*
+- [ ] 5. Bahaya bencana — InaRISK *(skrip)*
+- [ ] 6. Statistik — BPS *(skrip)*
+- [ ] 7. Olah jadi siap pakai *(skrip)*
+- [ ] 8. Cek hasilnya cocok
+
+Tiga langkah manual (2–4) tidak bisa diotomatiskan karena situsnya butuh klik. Sisanya dijalankan skrip.
+
+---
+
+## 0. Pasang QGIS
+
+Wajib. Dipakai skrip untuk memotong data, dan dipakai kamu untuk melihat petanya.
+
+1. [qgis.org/download](https://qgis.org/download/)
+2. Pilih **Long Term Version (LTR)**
+3. Install biasa (±583 MB, agak lama)
+
+---
+
+## 1. Siapkan Python
+
+Dari folder utama proyek:
+
+```bash
+pip install requests pandas lxml html5lib beautifulsoup4 matplotlib
 ```
-<sumber>_<wilayah>_<tahun>.<ext>
-
-contoh:  osm_jaksel_2026.geojson
-```
 
 ---
 
-## Checklist Tim
-
-Centang kalau sudah selesai, lalu commit perubahannya.
-
-- [ ] 1. POI kompetitor (Overpass)
-- [ ] 2. Kepadatan penduduk (WorldPop)
-- [ ] 3. Risiko bencana (InaRISK)
-- [ ] 4. API Key BPS
-- [ ] 5. Batas wilayah (GADM)
-- [ ] 6. QGIS terpasang
-
----
-
-## 0. Pasang QGIS dulu
-
-Tanpa ini, file `.tif` dan `.shp` tidak bisa dibuka.
-
-1. Buka [qgis.org/download](https://qgis.org/download/)
-2. Pilih **Long Term Version (LTR)** — lebih stabil
-3. Install seperti biasa, next-next-finish
-
----
-
-## 1. POI Kompetitor — Overpass Turbo
-
-⏱️ ~5 menit · 🟢 Paling gampang
+## 2. POI Kompetitor — Overpass Turbo *(manual, ~5 menit)*
 
 1. Buka [overpass-turbo.eu](https://overpass-turbo.eu/)
-2. **Geser & zoom peta** ke wilayah studi kasus (contoh: Jakarta Selatan)
-   > ⚠️ Zoom secukupnya. Kalau areanya kelewat luas, query-nya timeout.
-3. Hapus isi kotak kiri
-4. Buka file [`queries/poi_kompetitor.overpassql`](queries/poi_kompetitor.overpassql), copy semua isinya, paste ke kotak kiri
-5. Klik tombol **Run** (▶)
-6. Tunggu sampai titik-titik muncul di peta
-7. Klik **Export** → **download as GeoJSON**
-8. Simpan ke `data/raw/` dengan nama `osm_<wilayah>_2026.geojson`
+2. **Zoom peta ke Jakarta Selatan** sampai satu kota kelihatan penuh di layar
+3. Hapus isi kotak kiri, paste query ini **persis**:
 
-### Cara ganti kategori
-
-Pola tiap baris:
 ```
-node["amenity"="restaurant"]({{bbox}});
-       ↑kunci      ↑nilai
+[out:json][timeout:90];
+(
+  node["amenity"="restaurant"]({{bbox}});
+  node["amenity"="cafe"]({{bbox}});
+  node["amenity"="fast_food"]({{bbox}});
+  node["shop"="mall"]({{bbox}});
+  way["shop"="mall"]({{bbox}});
+  node["shop"="supermarket"]({{bbox}});
+  node["shop"="convenience"]({{bbox}});
+  node["amenity"="bank"]({{bbox}});
+  node["tourism"="hotel"]({{bbox}});
+);
+out center;
 ```
 
-Yang diganti cuma isi dalam kutip:
+4. Klik **Run** (▶), tunggu titik muncul
+5. **Export** → **download as GeoJSON**
+6. Pindahkan ke `data/raw/` dan **ganti namanya** jadi:
 
-| Mau cari | Tulis begini |
-|----------|--------------|
-| Klub malam | `node["amenity"="nightclub"]({{bbox}});` |
-| Bar | `node["amenity"="bar"]({{bbox}});` |
-| Hotel | `node["tourism"="hotel"]({{bbox}});` |
-| Minimarket | `node["shop"="convenience"]({{bbox}});` |
-| Mall | `node["shop"="mall"]({{bbox}});` |
-| Rumah sakit | `node["amenity"="hospital"]({{bbox}});` |
+```
+osm_poi_jaksel_2026.geojson
+```
 
-> **Perhatikan kuncinya bisa beda.** Mall pakai `shop`, bukan `amenity`.
-
-### Kenapa ada `node` dan `way`?
-
-- `node` = titik (kafe kecil)
-- `way` = area/bangunan (mall, rumah sakit)
-
-Bangunan besar sering terdaftar sebagai `way`. Kalau cuma ambil `node`, banyak yang kelewat. Baris `out center;` di akhir yang membuat `way` ikut keluar sebagai titik tengah.
-
-Daftar tag lengkap: [OSM Map Features](https://wiki.openstreetmap.org/wiki/Map_features)
+> Hasilnya sekitar **3.900–4.000 titik**. Kalau jauh lebih sedikit, zoom-nya kurang lebar. Kalau query timeout, zoom-nya kelebaran.
 
 ---
 
-## 2. Kepadatan Penduduk — WorldPop
-
-⏱️ ~10 menit (filenya besar) · 🟢
+## 3. Kepadatan Penduduk — WorldPop *(manual, ~10 menit)*
 
 1. Buka [hub.worldpop.org/geodata/summary?id=6376](https://hub.worldpop.org/geodata/summary?id=6376)
-2. Scroll ke bawah, cari tombol **Download**
-3. File `.tif` (GeoTIFF) akan terunduh — sabar, ukurannya lumayan
-4. Simpan ke `data/raw/` dengan nama `worldpop_idn_2020.tif`
+2. Scroll ke bawah → tombol **Download**
+3. File `idn_ppp_2020.tif` terunduh (**±1 GB**, sabar)
+4. Pindahkan ke `data/raw/` dan **ganti namanya** jadi:
 
-**Cara buka:** drag file `.tif` langsung ke jendela QGIS.
-
-Isinya: jumlah orang per petak 100×100 meter.
-
----
-
-## 3. Risiko Bencana — InaRISK
-
-⏱️ ~10 menit · 🟢
-
-1. Buka [inarisk2.bnpb.go.id/portal](https://inarisk2.bnpb.go.id/portal/)
-2. Di menu atas, klik **"Unduh Data Peta"**
-3. Pilih jenis bahaya. Untuk proyek ini yang paling terpakai:
-   - **Banjir** ← ambil ini dulu, paling berpengaruh ke keputusan lokasi
-   - Gempa Bumi
-   - Longsor
-4. Pilih wilayah studi kasus
-5. Download
-6. Simpan ke `data/raw/` dengan nama `inarisk_banjir_<wilayah>_2026.geojson`
-
-### Alternatif: langsung dari QGIS
-
-Kalau portalnya ribet, tarik layernya langsung:
-
-**QGIS → menu Layer → Add Layer → Add ArcGIS REST Server Layer**
-
-Lalu masukkan URL REST service InaRISK. Cara ini lebih cepat kalau cuma mau lihat-lihat.
+```
+worldpop_idn_2020.tif
+```
 
 ---
 
-## 4. API Key BPS
+## 4. Batas Wilayah — GADM *(manual, ~5 menit)*
 
-⏱️ ~5 menit · 🔑 Perlu daftar
+1. Buka [gadm.org/download_country.html](https://gadm.org/download_country.html)
+2. Dropdown → pilih **Indonesia**
+3. Klik **Shapefile** (`gadm41_IDN_shp.zip`, ±234 MB)
+4. **Unzip** ke folder `data/raw/gadm/`
 
-1. Buka [webapi.bps.go.id/developer](https://webapi.bps.go.id/developer/)
-2. Daftar pakai email
-3. Cek email → klik link aktivasi
-4. Masuk ke menu **Profile → Applications → Add Application**
-5. Salin **API Key** yang muncul
+Hasilnya 25 berkas (`gadm41_IDN_0` sampai `_4`, masing-masing 5 berkas). Yang dipakai cuma level 3 (kecamatan), tapi biarkan semuanya.
 
-### Simpan key-nya
+> ⚠️ Harus di-unzip. Shapefile bukan satu berkas — `.shp` tidak bisa dibaca tanpa `.dbf`, `.shx`, dan `.prj` di folder yang sama.
 
-⚠️ **JANGAN commit API Key ke GitHub.**
+---
 
-Salin `.env.example` jadi `.env` di folder utama proyek, lalu isi key-nya:
+## 5. Bahaya Bencana — InaRISK *(skrip, ~1 menit)*
+
+**Tidak perlu daftar akun.** Portal unduh InaRISK memang minta pendaftaran, tapi layanan REST BNPB terbuka penuh — skrip mengambil dari situ.
+
+```bash
+python scripts/ambil_inarisk.py
+```
+
+Hasil yang benar:
+
+```
+✅ banjir         385 KB  →  inarisk_bahaya_banjir_jaksel.tif
+✅ gempa          385 KB  →  inarisk_bahaya_gempa_jaksel.tif
+⏭️  longsor    kosong di wilayah ini — dilewati
+✅ multi          385 KB  →  inarisk_bahaya_multi_jaksel.tif
+⏭️  kebakaran  kosong di wilayah ini — dilewati
+⏭️  tsunami    kosong di wilayah ini — dilewati
+
+3 dari 6 layer tersimpan di data/raw/
+```
+
+**3 layer terpakai, 3 dilewati.** Longsor, tsunami, dan kebakaran hutan memang kosong di Jakarta Selatan — wilayahnya datar, bukan pesisir, dan tidak berhutan. Itu bukan kegagalan.
+
+Lihat seluruh 158 layer yang disediakan BNPB:
+
+```bash
+python scripts/ambil_inarisk.py --daftar
+```
+
+---
+
+## 6. Statistik — BPS *(skrip, ~5 menit)*
+
+### Ambil API Key
+
+1. Daftar di [webapi.bps.go.id/developer](https://webapi.bps.go.id/developer/) pakai email
+2. Cek email → klik link aktivasi
+3. **Profile → Applications → Add Application**
+4. Salin API Key-nya
+
+### Simpan key
+
+Salin `.env.example` jadi `.env`, isi key-nya:
 
 ```
 BPS_API_KEY=key_kamu_disini
 ```
 
-File `.env` sudah diblokir lewat `.gitignore`, jadi aman.
+⚠️ **Jangan commit `.env`.** Sudah diblokir `.gitignore`.
 
-### Ambil datanya
-
-Sudah ada skrip siap pakai di [`scripts/bps.py`](scripts/bps.py). Jalankan dari folder utama proyek.
-
-**Langkah 1 — cari kode wilayah:**
+### Ambil 4 tabel ini
 
 ```bash
-python scripts/bps.py wilayah jakarta
+python scripts/bps.py ambil 3171 18
+python scripts/bps.py ambil 3171 24
+python scripts/bps.py ambil 3171 66
+python scripts/bps.py ambil 3171 3
 ```
 
-Keluar daftar kode wilayah. Catat kode kota yang jadi studi kasus.
+| ID | Isi |
+|----|-----|
+| **18** | Jumlah penduduk per kecamatan 2021 ⭐ paling penting |
+| 24 | Penduduk per kecamatan menurut agama |
+| 66 | PDRB triwulanan 2022–2024 |
+| 3 | Penduduk miskin 2002–2012 |
 
-**Langkah 2 — cari tabel yang dibutuhkan:**
+Cari tabel lain:
 
 ```bash
-python scripts/bps.py cari 3171 penduduk
+python scripts/bps.py wilayah jakarta       # daftar kode wilayah
+python scripts/bps.py cari 3171 penduduk    # cari tabel
 ```
-
-Ganti `3171` dengan kode wilayahmu. Kata kunci yang berguna untuk proyek ini:
-
-| Kata kunci | Dapat apa |
-|-----------|-----------|
-| `penduduk` | Jumlah & kepadatan penduduk |
-| `pengeluaran` | Pengeluaran per kapita (proxy daya beli) |
-| `pdrb` | Produk domestik regional bruto |
-| `kemiskinan` | Persentase penduduk miskin |
-| `kesehatan` | Jumlah faskes |
-| `pendidikan` | Jumlah sekolah |
-
-**Langkah 3 — ambil tabelnya:**
-
-```bash
-python scripts/bps.py ambil 3171 123
-```
-
-Angka terakhir adalah `table_id` dari hasil langkah 2. Hasilnya otomatis tersimpan sebagai CSV di `data/raw/`.
-
-Dokumentasi API: [webapi.bps.go.id/documentation](https://webapi.bps.go.id/documentation/)
 
 ---
 
-## 5. Batas Wilayah — GADM
+## 7. Olah Jadi Siap Pakai *(skrip, ~2 menit)*
 
-⏱️ ~3 menit · 🟢
+```bash
+python scripts/siapkan_data.py
+```
 
-1. Buka [gadm.org/download_country.html](https://gadm.org/download_country.html)
-2. Pilih **Indonesia** dari dropdown
-3. Download format **Shapefile** atau **GeoPackage**
-4. Simpan ke `data/raw/`
+Yang dikerjakan:
 
-Isinya batas provinsi, kabupaten/kota, kecamatan. Dipakai untuk memotong data agar fokus ke satu wilayah saja.
+| Dari | Jadi |
+|------|------|
+| GADM nasional (6.695 kecamatan) | 10 kecamatan Jakarta Selatan |
+| WorldPop nasional (1.015 MB) | Potongan Jaksel (**0,2 MB**) |
 
-> **Catatan lisensi:** GADM hanya untuk penggunaan non-komersial. Aman untuk tugas kuliah.
+Skrip juga membetulkan masalah di GADM: sebagian kecamatan tertulis dengan dua ejaan (*Kabayoran/Kebayoran Lama*, *Setia Budi/Setiabudi*), sehingga Jakarta Selatan terbaca 12 poligon padahal kecamatannya 10. Ejaannya diseragamkan sekalian disamakan dengan penulisan BPS supaya kedua sumber bisa digabung.
 
 ---
 
-## 6. Opsional — kalau sudah selesai semua
+## 8. Cek Hasilnya Cocok
 
-| Data | Link | Untuk apa |
-|------|------|-----------|
-| Peta RBI resmi | [Ina-Geoportal](https://tanahair.indonesia.go.id/portal-web/unduh) | Batas wilayah versi resmi BIG (perlu daftar) |
-| Banjir real-time | [PetaBencana API](https://docs.petabencana.id/routes) | Data banjir terkini |
-| Nightlight | [VIIRS di GEE](https://developers.google.com/earth-engine/datasets/catalog/NOAA_VIIRS_DNB_MONTHLY_V1_VCMSLCFG) | Proxy keramaian malam |
-| Jalan lengkap | [Geofabrik](https://download.geofabrik.de/asia/indonesia.html) | 1,6 GB — hanya kalau butuh jaringan jalan penuh |
-
----
-
-## Setelah Semua Terkumpul
-
-Buka QGIS, lalu tumpuk layer berurutan dari bawah ke atas:
-
-```
-1. Batas wilayah (GADM)        ← paling bawah
-2. Kepadatan penduduk (WorldPop)
-3. Risiko banjir (InaRISK)
-4. POI kompetitor (OSM)        ← paling atas
+```bash
+python scripts/lihat_data.py
 ```
 
-Dari tumpukan ini polanya mulai kelihatan: mana daerah padat tapi minim fasilitas, mana yang ramai tapi rawan banjir.
+Buka `reports/tampilan_data.png`. Kalau muncul 4 panel peta, semuanya beres.
 
-Itu bahan mentah untuk mesin skoring.
+### Isi folder yang benar
+
+**`data/raw/`**
+
+| Berkas | Ukuran |
+|--------|--------|
+| `osm_poi_jaksel_2026.geojson` | ±2,0 MB |
+| `worldpop_idn_2020.tif` | ±1.015 MB |
+| `inarisk_bahaya_banjir_jaksel.tif` | 385 KB |
+| `inarisk_bahaya_gempa_jaksel.tif` | 385 KB |
+| `inarisk_bahaya_multi_jaksel.tif` | 385 KB |
+| `bps_3171_18_*.csv` | ±0,5 KB |
+| `bps_3171_24_*.csv` | ±2 KB |
+| `bps_3171_66_*.csv` | ±6 KB |
+| `bps_3171_3_*.csv` | ±1 KB |
+| `gadm/` | 25 berkas, ±410 MB |
+
+**`data/processed/`**
+
+| Berkas | Ukuran |
+|--------|--------|
+| `jaksel_kecamatan_bersih.gpkg` | ±224 KB — **harus 10 kecamatan** |
+| `worldpop_jaksel_2020.tif` | ±207 KB — **harus 229 × 268 piksel** |
+
+Semua raster berukuran **229 × 268 piksel** pada extent yang sama, jadi bisa ditumpuk piksel per piksel tanpa penyesuaian.
 
 ---
 
 ## Kalau Nyangkut
 
-| Masalah | Penyebab & solusi |
-|---------|-------------------|
-| Overpass timeout | Area kelewat luas — zoom lebih dekat, atau kurangi jumlah kategori |
-| File `.tif` gak bisa dibuka | Belum pasang QGIS. Jangan dibuka pakai Photos/Paint |
-| Download WorldPop lama | Wajar, filenya besar. Tunggu saja |
-| Hasil Overpass kosong | Salah tag, atau memang tidak ada objeknya di area itu. Coba tag lain |
-| Layer QGIS tidak sejajar | Beda sistem koordinat. Set project CRS ke **EPSG:4326 (WGS 84)** |
+| Masalah | Solusi |
+|---------|--------|
+| Overpass timeout | Zoom lebih dekat, atau kurangi kategori |
+| Hasil POI cuma ratusan | Zoom kurang lebar, ulangi |
+| `.tif` gelap semua di Photos | Wajar — itu grid angka. Buka pakai QGIS atau jalankan `lihat_data.py` |
+| Skrip bilang GDAL tidak ketemu | QGIS belum terpasang, atau set `GDAL_BIN` ke folder bin QGIS |
+| `bps.py` bilang API Key belum ada | Berkas `.env` belum dibuat atau salah isi |
+| `siapkan_data.py` melewati langkah | Berkas sumbernya belum ada — cek nama berkasnya sudah persis |
+| Shapefile tidak terbaca | Belum di-unzip, atau `.dbf`/`.shx` terpisah dari `.shp` |
 
 ---
 
-## ⚠️ Aturan Penting
+## ⚠️ Aturan Data
 
-**Jangan commit file di folder `data/` ke GitHub.** File geospasial ukurannya besar dan bikin repo berat — sudah diblokir lewat `.gitignore`.
+**Jangan commit isi folder `data/` ke GitHub.** Berkas geospasial terlalu besar — sudah diblokir `.gitignore`.
 
-Kalau perlu berbagi hasil download ke tim:
-1. Upload ke Google Drive
-2. Catat linknya di tabel **"Data bersama tim"** di [`DATASETS.md`](DATASETS.md)
-3. Commit perubahan `DATASETS.md`-nya saja
+Setiap orang mengunduh sendiri mengikuti panduan ini. Itu sebabnya penamaan berkas harus persis: supaya skrip berjalan sama di semua komputer.
+
+Kalau perlu berbagi hasil olahan, upload ke Google Drive lalu catat tautannya di tabel **"Data bersama tim"** pada [`DATASETS.md`](DATASETS.md).
