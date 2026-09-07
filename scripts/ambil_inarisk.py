@@ -19,15 +19,13 @@ from pathlib import Path
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wilayah as w
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "raw"
 
 REST = "https://gis.bnpb.go.id/server/rest/services/inarisk"
-
-# Harus sama dengan BBOX dan ukuran raster di siapkan_data.py,
-# supaya seluruh layer bertumpuk tepat piksel per piksel.
-BBOX = "106.707,-6.396,106.897,-6.173"
-UKURAN = "229,268"
 
 LAYER = {
     "banjir": "layer_bahaya_banjir",
@@ -54,10 +52,10 @@ def ambil(nama: str, service: str) -> bool:
     """Unduh satu layer bahaya sebagai GeoTIFF."""
     url = f"{REST}/{service}/ImageServer/exportImage"
     param = {
-        "bbox": BBOX,
+        "bbox": w.bbox(),
         "bboxSR": "4326",
         "imageSR": "4326",
-        "size": UKURAN,
+        "size": w.ukuran(),
         "format": "tiff",
         "pixelType": "F32",
         "f": "image",
@@ -74,14 +72,14 @@ def ambil(nama: str, service: str) -> bool:
         return False
 
     # Layer yang tidak punya data di wilayah ini mengembalikan berkas
-    # sangat kecil. Contoh: longsor di Jakarta Selatan yang datarannya
-    # rata, sehingga memang tidak ada indeks bahayanya.
+    # sangat kecil. Contoh: longsor di Jakarta yang datarannya rata,
+    # sehingga memang tidak ada indeks bahayanya.
     if len(r.content) < 5000:
         print(f"⏭️  {nama:<10} kosong di wilayah ini — dilewati")
         return False
 
     OUT.mkdir(parents=True, exist_ok=True)
-    berkas = OUT / f"inarisk_bahaya_{nama}_jaksel.tif"
+    berkas = OUT / f"inarisk_bahaya_{nama}_{w.KODE}.tif"
     berkas.write_bytes(r.content)
     print(f"✅ {nama:<10} {len(r.content)/1024:>7.0f} KB  →  {berkas.name}")
     return True
@@ -102,7 +100,7 @@ def main() -> None:
             f"   Pilihan: {', '.join(LAYER)}"
         )
 
-    print(f"Mengambil dari BNPB — wilayah {BBOX}\n")
+    print(f"Mengambil dari BNPB — {w.NAMA} ({w.bbox()})\n")
     berhasil = sum(ambil(n, LAYER[n]) for n in pilihan)
     print(f"\n{berhasil} dari {len(pilihan)} layer tersimpan di data/raw/")
 

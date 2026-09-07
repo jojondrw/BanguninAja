@@ -10,15 +10,17 @@ Total waktu: ~30 menit (sebagian besar cuma nunggu download).
 
 - [ ] 0. Pasang QGIS
 - [ ] 1. Siapkan Python
-- [ ] 2. POI kompetitor — Overpass *(manual)*
-- [ ] 3. Kepadatan penduduk — WorldPop *(manual)*
-- [ ] 4. Batas wilayah — GADM *(manual)*
+- [ ] 2. Kepadatan penduduk — WorldPop *(manual)*
+- [ ] 3. Batas wilayah — GADM *(manual)*
+- [ ] 4. POI, lahan, bangunan — OSM *(skrip)*
 - [ ] 5. Bahaya bencana — InaRISK *(skrip)*
 - [ ] 6. Statistik — BPS *(skrip)*
 - [ ] 7. Olah jadi siap pakai *(skrip)*
 - [ ] 8. Cek hasilnya cocok
 
-Tiga langkah manual (2–4) tidak bisa diotomatiskan karena situsnya butuh klik. Sisanya dijalankan skrip.
+Cuma 2 langkah manual (2 dan 3) karena situsnya butuh klik. Sisanya dijalankan skrip.
+
+**Wilayah studi: DKI Jakarta** (5 kota, 43 kecamatan). Diatur di `scripts/wilayah.py` — kalau mau pindah wilayah, cukup ubah berkas itu.
 
 ---
 
@@ -42,54 +44,14 @@ pip install requests pandas lxml html5lib beautifulsoup4 matplotlib
 
 ---
 
-## 2. POI Kompetitor — Overpass Turbo *(manual, ~5 menit)*
-
-1. Buka [overpass-turbo.eu](https://overpass-turbo.eu/)
-2. **Zoom peta ke Jakarta Selatan** sampai satu kota kelihatan penuh di layar
-3. Hapus isi kotak kiri, paste query ini **persis**:
-
-```
-[out:json][timeout:90];
-(
-  node["amenity"="restaurant"]({{bbox}});
-  node["amenity"="cafe"]({{bbox}});
-  node["amenity"="fast_food"]({{bbox}});
-  node["shop"="mall"]({{bbox}});
-  way["shop"="mall"]({{bbox}});
-  node["shop"="supermarket"]({{bbox}});
-  node["shop"="convenience"]({{bbox}});
-  node["amenity"="bank"]({{bbox}});
-  node["tourism"="hotel"]({{bbox}});
-);
-out center;
-```
-
-4. Klik **Run** (▶), tunggu titik muncul
-5. **Export** → **download as GeoJSON**
-6. Pindahkan ke `data/raw/` dan **ganti namanya** jadi:
-
-```
-osm_poi_jaksel_2026.geojson
-```
-
-> Hasilnya sekitar **3.900–4.000 titik**. Kalau jauh lebih sedikit, zoom-nya kurang lebar. Kalau query timeout, zoom-nya kelebaran.
-
----
-
-## 3. Kepadatan Penduduk — WorldPop *(manual, ~10 menit)*
+## 2. Kepadatan Penduduk — WorldPop *(manual, ~10 menit)*
 
 1. Buka [hub.worldpop.org/geodata/summary?id=6376](https://hub.worldpop.org/geodata/summary?id=6376)
 2. Scroll ke bawah → tombol **Download**
 3. File `idn_ppp_2020.tif` terunduh (**±1 GB**, sabar)
-4. Pindahkan ke `data/raw/` dan **ganti namanya** jadi:
+4. Pindahkan ke `data/raw/`, ganti namanya jadi `worldpop_idn_2020.tif`
 
-```
-worldpop_idn_2020.tif
-```
-
----
-
-## 4. Batas Wilayah — GADM *(manual, ~5 menit)*
+## 3. Batas Wilayah — GADM *(manual, ~5 menit)*
 
 1. Buka [gadm.org/download_country.html](https://gadm.org/download_country.html)
 2. Dropdown → pilih **Indonesia**
@@ -99,6 +61,29 @@ worldpop_idn_2020.tif
 Hasilnya 25 berkas (`gadm41_IDN_0` sampai `_4`, masing-masing 5 berkas). Yang dipakai cuma level 3 (kecamatan), tapi biarkan semuanya.
 
 > ⚠️ Harus di-unzip. Shapefile bukan satu berkas — `.shp` tidak bisa dibaca tanpa `.dbf`, `.shx`, dan `.prj` di folder yang sama.
+
+---
+
+## 4. POI, Lahan & Bangunan — OpenStreetMap *(skrip, ~5 menit)*
+
+Dulu langkah ini manual lewat overpass-turbo.eu. Sekarang otomatis.
+
+```bash
+python scripts/ambil_poi.py
+```
+
+Empat kelompok yang diambil:
+
+| Kelompok | Isi | Untuk apa |
+|----------|-----|-----------|
+| `kompetitor` | Restoran, kafe, mall, bank, hotel, minimarket | Menghitung persaingan |
+| `lahan` | Lahan yang tipe penggunaannya layak dibangun | Kandidat lokasi (mode bangun baru) |
+| `terlarang` | Taman, makam, air, hutan, permukiman | **Dikecualikan mutlak** |
+| `komersial` | Bangunan niaga & ruko | Kandidat lokasi (mode sewa/beli unit) |
+
+Kelompok `terlarang` yang mencegah sistem menyarankan taman kota atau halaman rumah orang.
+
+> Kalau muncul "cermin sibuk", tunggu sebentar lalu ulangi. Server Overpass gratis dan kadang antre.
 
 ---
 
@@ -113,17 +98,19 @@ python scripts/ambil_inarisk.py
 Hasil yang benar:
 
 ```
-✅ banjir         385 KB  →  inarisk_bahaya_banjir_jaksel.tif
-✅ gempa          385 KB  →  inarisk_bahaya_gempa_jaksel.tif
+✅ banjir         769 KB  →  inarisk_bahaya_banjir_dki.tif
+✅ gempa          769 KB  →  inarisk_bahaya_gempa_dki.tif
 ⏭️  longsor    kosong di wilayah ini — dilewati
-✅ multi          385 KB  →  inarisk_bahaya_multi_jaksel.tif
+✅ multi          769 KB  →  inarisk_bahaya_multi_dki.tif
 ⏭️  kebakaran  kosong di wilayah ini — dilewati
-⏭️  tsunami    kosong di wilayah ini — dilewati
+✅ tsunami        257 KB  →  inarisk_bahaya_tsunami_dki.tif
 
-3 dari 6 layer tersimpan di data/raw/
+4 dari 6 layer tersimpan di data/raw/
 ```
 
-**3 layer terpakai, 3 dilewati.** Longsor, tsunami, dan kebakaran hutan memang kosong di Jakarta Selatan — wilayahnya datar, bukan pesisir, dan tidak berhutan. Itu bukan kegagalan.
+**4 layer terpakai, 2 dilewati.** Longsor dan kebakaran hutan memang kosong di DKI — wilayahnya datar dan tidak berhutan. Itu bukan kegagalan.
+
+Tsunami terisi karena Jakarta Utara berbatasan dengan laut. Waktu wilayah studi masih Jakarta Selatan saja, layer ini kosong.
 
 Lihat seluruh 158 layer yang disediakan BNPB:
 
@@ -187,10 +174,10 @@ Yang dikerjakan:
 
 | Dari | Jadi |
 |------|------|
-| GADM nasional (6.695 kecamatan) | 10 kecamatan Jakarta Selatan |
-| WorldPop nasional (1.015 MB) | Potongan Jaksel (**0,2 MB**) |
+| GADM nasional (6.695 kecamatan) | **43 kecamatan** se-DKI Jakarta |
+| WorldPop nasional (1.015 MB) | Potongan DKI (**0,5 MB**) |
 
-Skrip juga membetulkan masalah di GADM: sebagian kecamatan tertulis dengan dua ejaan (*Kabayoran/Kebayoran Lama*, *Setia Budi/Setiabudi*), sehingga Jakarta Selatan terbaca 12 poligon padahal kecamatannya 10. Ejaannya diseragamkan sekalian disamakan dengan penulisan BPS supaya kedua sumber bisa digabung.
+Skrip juga membetulkan masalah di GADM: sebagian kecamatan tertulis dengan dua ejaan (*Kabayoran/Kebayoran Lama*, *Setia Budi/Setiabudi*), sehingga satu kecamatan terbaca sebagai dua poligon. Ejaannya diseragamkan sekalian disamakan dengan penulisan BPS supaya kedua sumber bisa digabung.
 
 ---
 
@@ -200,7 +187,7 @@ Skrip juga membetulkan masalah di GADM: sebagian kecamatan tertulis dengan dua e
 python scripts/lihat_data.py
 ```
 
-Buka `reports/tampilan_data.png`. Kalau muncul 4 panel peta, semuanya beres.
+Buka `reports/tampilan_data_dki.png`. Kalau muncul 4 panel peta, semuanya beres.
 
 ### Isi folder yang benar
 
@@ -208,25 +195,26 @@ Buka `reports/tampilan_data.png`. Kalau muncul 4 panel peta, semuanya beres.
 
 | Berkas | Ukuran |
 |--------|--------|
-| `osm_poi_jaksel_2026.geojson` | ±2,0 MB |
+| `osm_kompetitor_dki.geojson` | ±2,7 MB — **8.026 titik** |
+| `osm_terlarang_dki.geojson` | ±7,5 MB — 21.844 objek |
+| `osm_komersial_dki.geojson` | ±1,4 MB — 6.206 objek |
+| `osm_lahan_dki.geojson` | ±580 KB — 3.068 objek |
 | `worldpop_idn_2020.tif` | ±1.015 MB |
-| `inarisk_bahaya_banjir_jaksel.tif` | 385 KB |
-| `inarisk_bahaya_gempa_jaksel.tif` | 385 KB |
-| `inarisk_bahaya_multi_jaksel.tif` | 385 KB |
-| `bps_3171_18_*.csv` | ±0,5 KB |
-| `bps_3171_24_*.csv` | ±2 KB |
-| `bps_3171_66_*.csv` | ±6 KB |
-| `bps_3171_3_*.csv` | ±1 KB |
+| `inarisk_bahaya_banjir_dki.tif` | ±772 KB |
+| `inarisk_bahaya_gempa_dki.tif` | ±772 KB |
+| `inarisk_bahaya_multi_dki.tif` | ±772 KB |
+| `inarisk_bahaya_tsunami_dki.tif` | ±260 KB |
+| `bps_*.csv` | beberapa KB |
 | `gadm/` | 25 berkas, ±410 MB |
 
 **`data/processed/`**
 
 | Berkas | Ukuran |
 |--------|--------|
-| `jaksel_kecamatan_bersih.gpkg` | ±224 KB — **harus 10 kecamatan** |
-| `worldpop_jaksel_2020.tif` | ±207 KB — **harus 229 × 268 piksel** |
+| `dki_kecamatan_bersih.gpkg` | ±524 KB — **harus 43 kecamatan** |
+| `worldpop_dki_2020.tif` | ±464 KB — **harus 390 × 384 piksel** |
 
-Semua raster berukuran **229 × 268 piksel** pada extent yang sama, jadi bisa ditumpuk piksel per piksel tanpa penyesuaian.
+Semua raster berukuran **390 × 384 piksel** (±92 m per piksel) pada extent yang sama, jadi bisa ditumpuk piksel per piksel tanpa penyesuaian.
 
 ---
 
@@ -234,8 +222,8 @@ Semua raster berukuran **229 × 268 piksel** pada extent yang sama, jadi bisa di
 
 | Masalah | Solusi |
 |---------|--------|
-| Overpass timeout | Zoom lebih dekat, atau kurangi kategori |
-| Hasil POI cuma ratusan | Zoom kurang lebar, ulangi |
+| `ambil_poi.py` bilang cermin sibuk | Server Overpass gratis sedang antre. Tunggu 1–2 menit, jalankan lagi |
+| `ambil_poi.py` balas 406 | Versi skrip lama. Tarik pembaruan: `git pull` |
 | `.tif` gelap semua di Photos | Wajar — itu grid angka. Buka pakai QGIS atau jalankan `lihat_data.py` |
 | Skrip bilang GDAL tidak ketemu | QGIS belum terpasang, atau set `GDAL_BIN` ke folder bin QGIS |
 | `bps.py` bilang API Key belum ada | Berkas `.env` belum dibuat atau salah isi |

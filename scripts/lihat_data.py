@@ -23,12 +23,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Polygon as MplPolygon
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wilayah as w
+
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
 PROC = ROOT / "data" / "processed"
 OUT = ROOT / "reports"
 
-BATAS = (106.707, 106.897, -6.396, -6.173)  # kiri, kanan, bawah, atas
+BATAS = w.extent()  # kiri, kanan, bawah, atas
 
 
 def cari_gdal() -> Path:
@@ -69,7 +72,7 @@ def baca_raster(tif: Path) -> np.ndarray | None:
 
 def baca_batas() -> list:
     """Ambil poligon kecamatan sebagai daftar koordinat."""
-    gpkg = PROC / "jaksel_kecamatan_bersih.gpkg"
+    gpkg = PROC / f"{w.KODE}_kecamatan_bersih.gpkg"
     if not gpkg.exists():
         return []
 
@@ -98,7 +101,7 @@ def baca_batas() -> list:
 
 def baca_poi() -> dict:
     """Kelompokkan POI berdasarkan jenisnya."""
-    f = RAW / "osm_poi_jaksel_2026.geojson"
+    f = RAW / f"osm_kompetitor_{w.KODE}.geojson"
     if not f.exists():
         return {}
 
@@ -126,12 +129,12 @@ def main() -> None:
     poi = baca_poi()
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 13))
-    fig.suptitle("BanguninAja — Bentuk Data yang Dipakai\nKota Jakarta Selatan",
+    fig.suptitle(f"BanguninAja — Bentuk Data yang Dipakai\n{w.NAMA}",
                  fontsize=16, fontweight="bold")
 
     # 1. Kepadatan penduduk
     ax = axes[0][0]
-    pop = baca_raster(PROC / "worldpop_jaksel_2020.tif")
+    pop = baca_raster(PROC / f"worldpop_{w.KODE}_2020.tif")
     if pop is not None:
         ax.imshow(pop, extent=BATAS, cmap="YlOrRd", origin="upper")
     gambar_batas(ax, batas, "black", 0.7)
@@ -140,7 +143,7 @@ def main() -> None:
 
     # 2. Bahaya banjir
     ax = axes[0][1]
-    banjir = baca_raster(RAW / "inarisk_bahaya_banjir_jaksel.tif")
+    banjir = baca_raster(RAW / f"inarisk_bahaya_banjir_{w.KODE}.tif")
     if banjir is not None:
         ax.imshow(banjir, extent=BATAS, cmap="Blues", origin="upper")
     gambar_batas(ax, batas, "black", 0.7)
@@ -189,7 +192,7 @@ def main() -> None:
             a.tick_params(labelsize=7)
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    hasil = OUT / "tampilan_data.png"
+    hasil = OUT / f"tampilan_data_{w.KODE}.png"
     plt.savefig(hasil, dpi=110, bbox_inches="tight")
     print(f"✅ {hasil.relative_to(ROOT)}")
 
