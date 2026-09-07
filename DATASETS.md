@@ -99,14 +99,29 @@ Berisi nama, alamat, kelas RS, kepemilikan, jumlah tempat tidur, dokter spesiali
 
 | Data | Sumber | Akses | Status |
 |------|--------|-------|--------|
-| Indeks risiko multi-bahaya | [InaRISK BNPB](https://inarisk.bnpb.go.id/) | Web, REST API, Geoserver | 🟢 |
-| Portal unduh peta | [InaRISK Download](https://inarisk2.bnpb.go.id/portal/) | Download layer | 🟢 |
+| **Layanan REST BNPB** ⭐ | [gis.bnpb.go.id/server/rest/services/inarisk](https://gis.bnpb.go.id/server/rest/services/inarisk) | **158 layer, tanpa akun** | 🟢 |
+| Peta interaktif | [InaRISK BNPB](https://inarisk.bnpb.go.id/) | Web | 🟢 |
+| Portal unduh peta | [InaRISK Download](https://inarisk2.bnpb.go.id/portal/) | Perlu akun | 🔑 |
 | Banjir real-time | [PetaBencana API](https://docs.petabencana.id/routes) | REST API, CC BY 4.0 | 🟢 |
 | Gempa & cuaca | [BMKG](https://www.bmkg.go.id/) | Web, API | 🟢 |
 
 **Bahaya yang tercakup InaRISK:** banjir, banjir bandang, gempa bumi, tsunami, longsor, likuefaksi, letusan gunung api, kekeringan, cuaca ekstrem, gelombang ekstrem & abrasi, kebakaran hutan.
 
 Empat dimensi analisis: **Bahaya · Kerentanan · Kapasitas · Risiko**
+
+### Cara tercepat: lewat REST, bukan portal
+
+Portal unduhnya minta pendaftaran, tapi **layanan REST-nya terbuka penuh**. Pakai skrip:
+
+```bash
+python scripts/ambil_inarisk.py            # ambil semua layer
+python scripts/ambil_inarisk.py banjir     # satu layer saja
+python scripts/ambil_inarisk.py --daftar   # lihat 158 layer yang ada
+```
+
+Hasilnya otomatis dipotong ke wilayah studi dengan ukuran piksel yang sama persis dengan potongan WorldPop (229 × 268), jadi kedua raster langsung bisa ditumpuk tanpa penyesuaian.
+
+Untuk Jakarta Selatan, layer yang berisi data: **banjir**, **gempa**, dan **multi-bahaya**. Longsor, tsunami, dan kebakaran hutan mengembalikan nilai kosong — wajar, wilayahnya datar dan bukan pesisir.
 
 **PetaBencana endpoint:** `/floods`, `/floods/timeseries`, `/reports`, `/reports/archive`, `/infrastructure`
 Format output: JSON, XML, GeoJSON, TopoJSON, CAP
