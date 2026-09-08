@@ -98,19 +98,20 @@ python scripts/ambil_inarisk.py
 Hasil yang benar:
 
 ```
-✅ banjir         769 KB  →  inarisk_bahaya_banjir_dki.tif
-✅ gempa          769 KB  →  inarisk_bahaya_gempa_dki.tif
+✅ banjir         769 KB  maks 1.00  →  inarisk_bahaya_banjir_dki.tif
+✅ gempa          769 KB  maks 0.73  →  inarisk_bahaya_gempa_dki.tif
 ⏭️  longsor    kosong di wilayah ini — dilewati
-✅ multi          769 KB  →  inarisk_bahaya_multi_dki.tif
+✅ multi          769 KB  maks 1.00  →  inarisk_bahaya_multi_dki.tif
 ⏭️  kebakaran  kosong di wilayah ini — dilewati
-✅ tsunami        257 KB  →  inarisk_bahaya_tsunami_dki.tif
+⏭️  tsunami    nilainya nyaris nol (maks 0.050) — dilewati
 
-4 dari 6 layer tersimpan di data/raw/
+3 dari 6 layer tersimpan di data/raw/
 ```
 
-**4 layer terpakai, 2 dilewati.** Longsor dan kebakaran hutan memang kosong di DKI — wilayahnya datar dan tidak berhutan. Itu bukan kegagalan.
+**3 layer terpakai, 3 dilewati.** Itu bukan kegagalan:
 
-Tsunami terisi karena Jakarta Utara berbatasan dengan laut. Waktu wilayah studi masih Jakarta Selatan saja, layer ini kosong.
+- **Longsor** dan **kebakaran hutan** — DKI datar dan tidak berhutan, servernya membalas berkas kosong.
+- **Tsunami** — berkasnya terkirim penuh, tapi seluruh nilainya nyaris nol (maksimum 0,05 dari skala 0–1). Jakarta Utara memang berbatasan dengan laut, namun indeks bahaya tsunaminya dapat diabaikan. Skrip mengeceknya lewat isi raster, bukan ukuran berkas.
 
 Lihat seluruh 158 layer yang disediakan BNPB:
 
@@ -203,7 +204,6 @@ Buka `reports/tampilan_data_dki.png`. Kalau muncul 4 panel peta, semuanya beres.
 | `inarisk_bahaya_banjir_dki.tif` | ±772 KB |
 | `inarisk_bahaya_gempa_dki.tif` | ±772 KB |
 | `inarisk_bahaya_multi_dki.tif` | ±772 KB |
-| `inarisk_bahaya_tsunami_dki.tif` | ±260 KB |
 | `bps_*.csv` | beberapa KB |
 | `gadm/` | 25 berkas, ±410 MB |
 

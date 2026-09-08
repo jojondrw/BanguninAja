@@ -37,6 +37,48 @@ LAYER = {
 }
 
 
+# Indeks bahaya InaRISK berskala 0–1. Di bawah nilai ini, layer dianggap
+# tidak membawa informasi apa pun untuk wilayah studi.
+AMBANG_BERGUNA = 0.1
+
+
+def nilai_tertinggi(berkas: Path) -> float | None:
+    """
+    Baca nilai tertinggi sebuah raster lewat gdalinfo.
+
+    Mengembalikan None kalau GDAL tidak tersedia — dalam hal itu berkasnya
+    tetap disimpan, biar skrip ini tidak wajib butuh QGIS.
+    """
+    from shutil import which
+    import subprocess
+
+    gdalinfo = which("gdalinfo")
+    if gdalinfo is None:
+        for k in sorted(Path("C:/Program Files").glob("QGIS*"), reverse=True):
+            calon = k / "bin" / "gdalinfo.exe"
+            if calon.exists():
+                gdalinfo = str(calon)
+                break
+    if gdalinfo is None:
+        return None
+
+    try:
+        hasil = subprocess.run(
+            [gdalinfo, "-stats", str(berkas)],
+            capture_output=True, text=True, errors="replace", timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    for baris in hasil.stdout.splitlines():
+        if "STATISTICS_MAXIMUM=" in baris:
+            try:
+                return float(baris.split("=", 1)[1])
+            except ValueError:
+                return None
+    return None
+
+
 def daftar_layer() -> None:
     """Tampilkan seluruh layer yang disediakan BNPB."""
     r = requests.get(f"{REST}?f=json", timeout=60)
@@ -81,7 +123,18 @@ def ambil(nama: str, service: str) -> bool:
     OUT.mkdir(parents=True, exist_ok=True)
     berkas = OUT / f"inarisk_bahaya_{nama}_{w.KODE}.tif"
     berkas.write_bytes(r.content)
-    print(f"✅ {nama:<10} {len(r.content)/1024:>7.0f} KB  →  {berkas.name}")
+
+    # Ukuran berkas saja tidak cukup. Layer tsunami untuk DKI, misalnya,
+    # terkirim sebagai berkas 260 KB tetapi seluruh nilainya nyaris nol.
+    # Yang menentukan layer itu berguna atau tidak adalah isinya.
+    puncak = nilai_tertinggi(berkas)
+    if puncak is not None and puncak < AMBANG_BERGUNA:
+        berkas.unlink()
+        print(f"⏭️  {nama:<10} nilainya nyaris nol (maks {puncak:.3f}) — dilewati")
+        return False
+
+    catatan = "" if puncak is None else f"  maks {puncak:.2f}"
+    print(f"✅ {nama:<10} {len(r.content)/1024:>7.0f} KB{catatan}  →  {berkas.name}")
     return True
 
 
