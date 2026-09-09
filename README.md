@@ -61,6 +61,55 @@ Developer/investor · Analis lokasi · Konsultan properti · Admin data · Pemda
 
 ---
 
+## Visi Produk: Dari Site-Scoring ke Platform ERP
+
+Scope MVP di atas (site-scoring) adalah **fondasi**, bukan produk akhir. Visi jangka panjangnya: platform **SaaS multi-tenant** untuk perusahaan developer properti — satu instance melayani banyak perusahaan, data terisolasi per tenant.
+
+```mermaid
+graph TD
+    subgraph MVP["MVP Saat Ini"]
+        A[Site Scoring Engine]
+    end
+
+    subgraph SAAS["Platform SaaS Multi-Tenant — Roadmap"]
+        B[Project Tracker<br/>milestone & progres pembangunan]
+        C[Finance & Budgeting<br/>anggaran vs realisasi, cashflow]
+        D[Payment & Billing]
+    end
+
+    A --> B
+    A --> C
+    C --> D
+
+    D --> E[Billing Langganan SaaS<br/>tenant bayar kita]
+    D --> F[Pembayaran Unit/Lahan<br/>developer ↔ pembeli]
+    F --> G["Wallet Pembeli<br/>(MetaMask dll — sudah ada, tidak dibangun sendiri)"]
+    G -->|"kirim testnet-crypto"| H[(Blockchain Testnet<br/>pembayaran on-chain asli)]
+    H -->|"verifikasi via block explorer API"| F
+```
+
+Modul roadmap (belum diimplementasi, MVP tetap fokus scoring):
+
+| Modul | Fungsi |
+|---|---|
+| **Project Tracker** | Milestone & progres pembangunan per proyek, terhubung ke hasil scoring lokasi |
+| **Finance** | Anggaran vs realisasi, cashflow proyek — perluasan dari fitur "Laporan Investasi" yang sudah ada |
+| **Payment & Billing** | Dua lapis: (1) billing langganan SaaS dari tenant ke kami, (2) pembayaran unit/lahan developer↔pembeli **on-chain beneran** (bukan cuma dicatat) — lihat desain di bawah |
+
+### Desain Payment On-Chain (tanpa bikin consumer app)
+
+Nilai transaksi properti besar → perlu jaminan keamanan & audit trail yang tidak bisa diubah. Blockchain dipakai sebagai **jalur pembayaran itu sendiri**, bukan cuma pencatatan — tapi tanpa perlu membangun aplikasi konsumen terpisah:
+
+1. Seller app (bagian dari platform kami) generate **permintaan pembayaran**: nominal + alamat wallet tujuan (ditampilkan sebagai QR code)
+2. Pembeli kirim sejumlah **testnet-crypto** dari wallet pribadinya (MetaMask atau sejenis — tool generik yang sudah ada, bukan yang kami bangun) ke alamat tersebut
+3. Seller app **verifikasi** transaksi masuk lewat block explorer API (Etherscan/Polygonscan, gratis) — cocokkan jumlah & alamat, lalu tandai lunas
+
+Testnet publik dipilih karena **budget 0** — transaksi tercatat on-chain sungguhan, cuma jaringannya gratis (bukan mainnet berbayar).
+
+**Batasan realistis:** dibangun dengan **budget 0** — stack open-source, hosting free-tier, dan pencatatan blockchain pakai **testnet publik** (gratis, bukan mainnet berbayar).
+
+---
+
 ## Struktur Folder
 
 ```
