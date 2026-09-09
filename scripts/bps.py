@@ -25,6 +25,10 @@ from html import unescape
 
 import requests
 
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 BASE = "https://webapi.bps.go.id/v1/api"
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "data" / "raw"
