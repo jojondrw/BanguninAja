@@ -67,6 +67,11 @@ Developer/investor · Analis lokasi · Konsultan properti · Admin data · Pemda
 sitescope/
 ├── PANDUAN_DOWNLOAD.md  ← cara ambil datanya, langkah demi langkah
 ├── DATASETS.md          ← katalog sumber data + link & lisensi
+├── scripts/
+│   ├── ambil_inarisk.py     ambil data bahaya bencana dari BNPB
+│   ├── bps.py               ambil statistik wilayah dari BPS
+│   ├── siapkan_data.py      potong data nasional ke wilayah studi
+│   └── lihat_data.py        render data jadi peta yang bisa dilihat
 ├── data/
 │   ├── raw/             hasil download mentah (tidak di-commit)
 │   ├── processed/       hasil olahan
