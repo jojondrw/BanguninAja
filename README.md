@@ -112,43 +112,68 @@ Testnet publik dipilih karena **budget 0** — transaksi tercatat on-chain sungg
 
 ## Desain Data
 
-Rincian lengkap ada di [`docs/architecture/desain-data.md`](docs/architecture/desain-data.md).
-Ringkasnya: **28 dataset tidak menjadi 28 kriteria**. Kalau begitu bobot tiap
-kriteria jadi terlalu encer dan peringkatnya kabur. Setiap dataset diberi satu
-dari lima peran, lalu yang menjadi kriteria diringkas jadi enam dimensi.
+Rincian lengkap: [`docs/architecture/desain-data.md`](docs/architecture/desain-data.md)
 
-| Peran | Isi | Punya bobot? |
+Desain ini menjawab satu pertanyaan: **tiap dataset kerjanya apa di aplikasi?**
+Jawabannya ada empat jenis pekerjaan, dan tiap dataset kebagian satu.
+
+| Pekerjaan | Artinya | Dataset |
 |---|---|---|
-| **1. Penyaring keras** | Lahan terlarang (303.238 objek), kawasan hutan | Tidak — mencoret kandidat |
-| **2. Pembentuk kandidat** | Lahan layak bangun, bangunan komersial, batas wilayah | Tidak — menentukan yang dinilai |
-| **3. Kriteria skor** | 12 layer bahaya, ZNT, WorldPop, POI kompetitor, jalan, DEM, hidrologi | **Ya** |
-| **4. Kendala pengguna** | Budget, luas minimum, toleransi risiko | Memotong setelah skor |
-| **5. Bahan laporan** | IKK, BI SHPR, kriminalitas, SoilGrids, DEMNAS | Tidak |
+| **1. Mencoret** | Buang lokasi yang tidak boleh dibangun | Lahan terlarang (303.238 objek), kawasan hutan |
+| **2. Mencari** | Kumpulkan lokasi calon | Lahan layak bangun (106.467), bangunan komersial (48.501), batas wilayah |
+| **3. Menilai** | Beri nilai ke tiap calon | ZNT, 12 layer bahaya, WorldPop, POI kompetitor, jalan, DEM, hidrologi |
+| **4. Melaporkan** | Isi laporan setelah lokasi terpilih | IKK, BI SHPR, kriminalitas, SoilGrids, DEMNAS |
 
-**Enam dimensi penilaian**, hasil peringkasan peran ketiga:
+Yang kerjanya **menilai** jumlahnya banyak. Kalau masing-masing jadi kriteria
+sendiri, bobotnya terpecah dan peringkatnya kabur. Karena itu digabung menjadi
+**enam penilaian**:
 
-Risiko Bencana · Permintaan Pasar · Kompetisi · Aksesibilitas · Biaya Lahan · Kelayakan Fisik
+| Penilaian | Digabung dari |
+|---|---|
+| Risiko Bencana | 12 layer InaRISK |
+| Permintaan Pasar | WorldPop + PDRB + penduduk BPS |
+| Kompetisi | POI kompetitor |
+| Aksesibilitas | Jalan + transit + jangkauan faskes |
+| Biaya Lahan | ZNT |
+| Kelayakan Fisik | Kemiringan DEM + jarak sungai |
 
-Bobot bawaannya berbeda per profil bangunan dan dapat diubah pengguna. Contoh:
-hunian menomorsatukan biaya lahan (30%) dan risiko bencana (25%), sedangkan
-F&B menomorsatukan permintaan pasar dan kompetisi (masing-masing 25%).
+Bobot bawaannya berbeda per profil bangunan dan dapat diubah pengguna. Hunian
+menomorsatukan Biaya Lahan (30%) dan Risiko Bencana (25%); F&B menomorsatukan
+Permintaan Pasar dan Kompetisi (masing-masing 25%).
 
-**Yang sengaja tidak diberi bobot, beserta alasannya:**
+### Contoh: membangun mall di Bandung
 
-- **Kriminalitas** berhenti di level kabupaten/kota, jadi semua kandidat di
-  dalam satu wilayah mendapat nilai sama persis. Kriteria yang tidak
-  membedakan tidak mengubah urutan — memberinya bobot hanya menciptakan
-  ilusi bahwa keamanan diperhitungkan. Ditampilkan sebagai catatan konteks.
-- **Patahan aktif** sudah tercermin di indeks bahaya gempa. Dipakai terpisah
+| Langkah | Yang terjadi | Dataset |
+|---|---|---|
+| 1 | Ambil batas Bandung | GADM |
+| 2 | Bangun petak 92 m, khusus Bandung | — |
+| 3 | Coret petak yang menyentuh taman, sekolah, sungai | Lahan terlarang |
+| 4 | Kumpulkan lahan kosong yang tersisa | Lahan layak bangun |
+| 5 | Nilai tiap lahan pada enam penilaian | ZNT, InaRISK, WorldPop, dst |
+| 6 | Gabungkan memakai bobot profil mall | — |
+| 7 | Buang yang melebihi budget | ZNT + input user |
+| 8 | Tampilkan peringkat beserta alasannya | — |
+| 9 | Lokasi terpilih dibuatkan laporan | IKK, BI SHPR, SoilGrids |
+
+Langkah 2 adalah alasan sistem ini bisa berskala nasional: petak dibuat sesuai
+permintaan. Seluruh Indonesia pada petak 92 m berarti 224 juta petak, tidak
+mungkin dihitung. Satu kecamatan hanya sekitar 1.800 petak.
+
+### Yang sengaja tidak ikut menilai
+
+- **Kriminalitas** berhenti di level kabupaten/kota, sehingga semua calon di
+  dalam satu wilayah bernilai sama persis. Kriteria yang tidak membedakan tidak
+  mengubah urutan berapa pun bobotnya.
+- **Patahan aktif** sudah tercermin di indeks bahaya gempa — dipakai terpisah
   berarti menghitung faktor yang sama dua kali.
-- **IKK dan BI SHPR** menghasilkan angka *setelah* lokasi dipilih. Dipakai di
-  Laporan Investasi, bukan di peringkat.
-- **DEMNAS 8 m** lebih halus dari petak analisis 92 m, jadi detailnya hilang
-  dirata-ratakan. Dipakai untuk tampilan detail satu kandidat.
+- **IKK dan BI SHPR** menghasilkan angka *setelah* lokasi terpilih.
+- **DEMNAS 8 m** lebih halus dari petak 92 m, detailnya hilang dirata-ratakan.
 
-**Tiga keputusan yang masih menunggu kesepakatan tim** (dibahas di dokumen):
-mesin skoring MCDM atau model prediktif, nasib label presence-only, dan
-cakupan fitur "Cek zonasi" setelah RDTR dipastikan tidak tersedia.
+### Tiga keputusan yang masih menunggu kesepakatan tim
+
+Mesin skoring MCDM atau model prediktif · nasib label presence-only · cakupan
+fitur "Cek zonasi" setelah RDTR dipastikan tidak tersedia. Ketiganya dibahas
+lengkap beserta rekomendasi di dokumen desain.
 
 ---
 

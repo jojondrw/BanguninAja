@@ -8,6 +8,51 @@
 
 ---
 
+## 0. Ringkasan singkat
+
+Dokumen ini menjawab satu pertanyaan: **tiap dataset kerjanya apa di aplikasi?**
+
+Jawabannya ada **empat jenis pekerjaan**. Tiap dataset kebagian satu.
+
+| Pekerjaan | Artinya | Contoh dataset |
+|---|---|---|
+| **1. Mencoret** | Buang lokasi yang tidak boleh dibangun | Lahan terlarang, kawasan hutan |
+| **2. Mencari** | Kumpulkan lokasi calon | Lahan layak bangun, bangunan komersial |
+| **3. Menilai** | Beri nilai ke tiap calon | ZNT, bahaya bencana, penduduk, kompetitor |
+| **4. Melaporkan** | Isi laporan setelah lokasi terpilih | IKK, BI SHPR, SoilGrids |
+
+Yang kerjanya **menilai** jumlahnya banyak. Kalau masing-masing jadi kriteria
+sendiri, bobotnya terpecah dan peringkatnya kabur. Karena itu digabung menjadi
+**enam penilaian**:
+
+| Penilaian | Digabung dari |
+|---|---|
+| Risiko Bencana | 12 layer InaRISK |
+| Permintaan Pasar | WorldPop + PDRB + penduduk BPS |
+| Kompetisi | POI kompetitor |
+| Aksesibilitas | Jalan + transit + jangkauan faskes |
+| Biaya Lahan | ZNT |
+| Kelayakan Fisik | Kemiringan DEM + jarak sungai |
+
+### Contoh: user ingin membangun mall di Bandung
+
+| Langkah | Yang terjadi | Dataset |
+|---|---|---|
+| 1 | Ambil batas Bandung | GADM |
+| 2 | Bangun petak 92 m, khusus Bandung | — |
+| 3 | Coret petak yang menyentuh taman, sekolah, sungai | Lahan terlarang |
+| 4 | Kumpulkan lahan kosong yang tersisa | Lahan layak bangun |
+| 5 | Nilai tiap lahan pada enam penilaian | ZNT, InaRISK, WorldPop, dst |
+| 6 | Gabungkan memakai bobot profil mall | — |
+| 7 | Buang yang melebihi budget | ZNT + input user |
+| 8 | Tampilkan peringkat beserta alasannya | — |
+| 9 | Lokasi terpilih dibuatkan laporan | IKK, BI SHPR, SoilGrids |
+
+Bagian selanjutnya menjelaskan hal yang sama secara rinci, beserta alasan di
+balik tiap keputusan.
+
+---
+
 ## 1. Tiga keputusan yang harus diambil lebih dulu
 
 Desain di bawah ini menganggap tiga hal berikut sudah diputuskan. Kalau
