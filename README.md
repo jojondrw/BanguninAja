@@ -110,6 +110,48 @@ Testnet publik dipilih karena **budget 0** — transaksi tercatat on-chain sungg
 
 ---
 
+## Desain Data
+
+Rincian lengkap ada di [`docs/architecture/desain-data.md`](docs/architecture/desain-data.md).
+Ringkasnya: **28 dataset tidak menjadi 28 kriteria**. Kalau begitu bobot tiap
+kriteria jadi terlalu encer dan peringkatnya kabur. Setiap dataset diberi satu
+dari lima peran, lalu yang menjadi kriteria diringkas jadi enam dimensi.
+
+| Peran | Isi | Punya bobot? |
+|---|---|---|
+| **1. Penyaring keras** | Lahan terlarang (303.238 objek), kawasan hutan | Tidak — mencoret kandidat |
+| **2. Pembentuk kandidat** | Lahan layak bangun, bangunan komersial, batas wilayah | Tidak — menentukan yang dinilai |
+| **3. Kriteria skor** | 12 layer bahaya, ZNT, WorldPop, POI kompetitor, jalan, DEM, hidrologi | **Ya** |
+| **4. Kendala pengguna** | Budget, luas minimum, toleransi risiko | Memotong setelah skor |
+| **5. Bahan laporan** | IKK, BI SHPR, kriminalitas, SoilGrids, DEMNAS | Tidak |
+
+**Enam dimensi penilaian**, hasil peringkasan peran ketiga:
+
+Risiko Bencana · Permintaan Pasar · Kompetisi · Aksesibilitas · Biaya Lahan · Kelayakan Fisik
+
+Bobot bawaannya berbeda per profil bangunan dan dapat diubah pengguna. Contoh:
+hunian menomorsatukan biaya lahan (30%) dan risiko bencana (25%), sedangkan
+F&B menomorsatukan permintaan pasar dan kompetisi (masing-masing 25%).
+
+**Yang sengaja tidak diberi bobot, beserta alasannya:**
+
+- **Kriminalitas** berhenti di level kabupaten/kota, jadi semua kandidat di
+  dalam satu wilayah mendapat nilai sama persis. Kriteria yang tidak
+  membedakan tidak mengubah urutan — memberinya bobot hanya menciptakan
+  ilusi bahwa keamanan diperhitungkan. Ditampilkan sebagai catatan konteks.
+- **Patahan aktif** sudah tercermin di indeks bahaya gempa. Dipakai terpisah
+  berarti menghitung faktor yang sama dua kali.
+- **IKK dan BI SHPR** menghasilkan angka *setelah* lokasi dipilih. Dipakai di
+  Laporan Investasi, bukan di peringkat.
+- **DEMNAS 8 m** lebih halus dari petak analisis 92 m, jadi detailnya hilang
+  dirata-ratakan. Dipakai untuk tampilan detail satu kandidat.
+
+**Tiga keputusan yang masih menunggu kesepakatan tim** (dibahas di dokumen):
+mesin skoring MCDM atau model prediktif, nasib label presence-only, dan
+cakupan fitur "Cek zonasi" setelah RDTR dipastikan tidak tersedia.
+
+---
+
 ## Struktur Folder
 
 ```
