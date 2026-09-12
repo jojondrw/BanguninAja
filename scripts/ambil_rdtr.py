@@ -217,6 +217,8 @@ def ambil_titik(id_wilayah: str, lat: float, lon: float, percobaan: int = 3) -> 
 
 SPASI_SCAN_KASAR_M = 2000  # RDTR cuma nutup "kawasan perkotaan", bukan seluruh kabupaten —
                             # scan kasar dulu biar gak buang request ke area kosong
+MAKS_TITIK_HALUS = 8000    # batas atas titik grid halus per kota — kalau kelewat, spasi
+                            # dinaikkan otomatis biar 1 kota gak makan waktu berjam-jam
 
 
 def cari_area_rdtr(id_wilayah: str, bbox: tuple[float, float, float, float]) -> tuple[float, float, float, float] | None:
@@ -271,7 +273,17 @@ def ambil_kota(entri: dict, spasi_m: float) -> None:
         return
 
     titik = buat_grid(bbox, spasi_m)
-    print(f"▶  {nama_kota} ({id_wilayah}): kawasan RDTR ketemu, {len(titik)} titik grid halus @ {spasi_m}m ({PEKERJA} paralel)")
+    if len(titik) > MAKS_TITIK_HALUS:
+        # Bbox kegedean — biasanya karena RDTR tersebar di beberapa kawasan kecil terpisah
+        # dalam 1 kabupaten (bukan 1 area menyatu), jadi bounding box ikut nyeret area
+        # kosong di antaranya. Perbesar spasi biar total titik gak "meledak".
+        spasi_asli = spasi_m
+        while len(titik) > MAKS_TITIK_HALUS:
+            spasi_m *= 1.5
+            titik = buat_grid(bbox, spasi_m)
+        print(f"⚠️  {nama_kota}: area kedeteksi kegedean (bbox {bbox}), spasi dinaikkan dari {spasi_asli:.0f}m jadi {spasi_m:.0f}m biar gak jadi {int(len(titik)*(spasi_asli/spasi_m)**2):,} titik")
+
+    print(f"▶  {nama_kota} ({id_wilayah}): kawasan RDTR ketemu, {len(titik)} titik grid halus @ {spasi_m:.0f}m ({PEKERJA} paralel)")
 
     hasil = []
     selesai = 0
