@@ -13,6 +13,19 @@ grid titik dalam batas kab/kota (dari GADM yang sudah ada), lalu query
 satu-satu. Hasilnya per titik: kode/nama zona, KDB, KLB, KDH, GSB, daftar
 kegiatan yang diizinkan/bersyarat.
 
+Format keluaran per kota: {"legenda_tbsktg": {hash: [...]}, "titik": [...]}.
+Field "tbsktg" dari API ~650KB dan identik untuk tiap varian klasifikasi
+zona, jadi disimpan sekali di "legenda_tbsktg" dan tiap titik cuma nyimpen
+referensi hash-nya ("_tbsktg_ref") — file jadi puluhan-ratusan kali lebih
+kecil daripada nyimpen mentah-mentah.
+
+PENTING — kecepatan sengaja dibikin pelan (PEKERJA=3 + jeda per request):
+run pertama dengan paralelisme tinggi (30) bikin endpoint /data server ini
+kolaps dan balikin 500 ke SEMUA orang selama berjam-jam (bukan cuma IP
+kita — dicek dari jalur network lain juga kena). ATR/BPN adalah portal
+publik pemerintah, bukan infra kita, jadi utamakan sopan santun ke server
+di atas ETA. Jangan naikkan PEKERJA tanpa alasan kuat.
+
 CARA PAKAI (dari folder utama proyek):
 
     python scripts/ambil_rdtr.py --katalog
@@ -23,13 +36,15 @@ CARA PAKAI (dari folder utama proyek):
         Tarik satu kota, grid 500m. Butuh katalog sudah ada.
 
     python scripts/ambil_rdtr.py --semua --spasi 500
-        Tarik SEMUA kota di katalog. Ini bisa puluhan ribu request —
-        jalankan semalaman, bukan buat dicoba iseng.
+        Tarik SEMUA kota di katalog. Ini bisa puluhan ribu request,
+        sengaja pelan (lihat catatan di atas) — jalankan semalaman/berhari,
+        bukan buat dicoba iseng, dan jangan dijalankan paralel dg proses lain.
 
 Perlu GADM (data/raw/gadm41_indonesia.gpkg) untuk batas wilayah tiap kota.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -68,13 +83,18 @@ OUT_DIR = ROOT / "data" / "raw" / "rdtr"
 GADM = ROOT / "data" / "raw" / "gadm41_indonesia.gpkg"
 
 BASE = "https://gistaru.atrbpn.go.id/rdtrinteraktif/api/interactive"
-PEKERJA = 10  # request paralel — bottleneck-nya latensi jaringan (~1 detik/request),
-              # bukan CPU. Sempat dicoba 15 tanpa retry dan kena rate-limit massal
-              # (31 kota salah ke-mark kosong), lalu dicoba 30 tapi belum diverifikasi
-              # aman. 10 sudah terbukti 11/11 kota sukses tanpa false-negative —
-              # dipakai buat run semalaman. Sekarang ada retry (ambil_titik) +
-              # retry-per-kota (cari_area_rdtr) jadi lebih tahan gangguan sesaat,
-              # dinaikkan lagi ke 30 buat kejar target selesai <1 hari
+
+# --- Post-mortem 2026-09-13 --------------------------------------------
+# Run semalaman dengan PEKERJA=30 bikin endpoint /data (yang di-hajar per
+# titik grid) mulai balikin 500 buat SEMUA orang, bukan cuma kita — dicek
+# dari dua jalur network independen (curl lokal + browser dari IP lain),
+# keduanya kena, dan status masih 500 6+ jam kemudian. Kemungkinan besar
+# backend /data itu berat (tiap respons ngebawa field legend ~650KB, lihat
+# JEDA_ANTAR_REQUEST di bawah) dan kolaps kena volume paralel tinggi.
+# Ini portal publik pemerintah, bukan infra kita — jadi turunin jauh lebih
+# konservatif daripada ngoyo ngejar ETA, biar gak bikin ulang.
+PEKERJA = 3          # paralel rendah, sengaja jauh di bawah kapasitas jaringan kita
+JEDA_ANTAR_REQUEST = 0.4  # detik, jeda per worker SETELAH tiap request (sukses/gagal)
 
 
 def cari_gdal() -> Path:
@@ -196,27 +216,34 @@ def buat_grid(bbox: tuple[float, float, float, float], spasi_m: float) -> list[t
 
 def ambil_titik(id_wilayah: str, lat: float, lon: float, percobaan: int = 3) -> dict | None:
     """Query satu titik. Retry beberapa kali — server ATR/BPN kadang timeout/rate-limit
-    sesaat pas dihajar banyak request paralel, gagal sekali bukan berarti genuinely kosong."""
-    for i in range(percobaan):
-        try:
-            r = requests.get(f"{BASE}/data", params={
-                "id_wilayah": id_wilayah, "latitude": lat, "longitude": lon,
-            }, timeout=20)
-            j = r.json()
-        except (requests.RequestException, ValueError):
-            if i < percobaan - 1:
+    sesaat pas dihajar banyak request paralel, gagal sekali bukan berarti genuinely kosong.
+
+    Jeda JEDA_ANTAR_REQUEST di akhir (sukses maupun gagal) sengaja dipasang di sini,
+    bukan di caller — biar tiap worker paralel benar-benar mengerem dirinya sendiri
+    tiap selesai satu request, apapun hasilnya."""
+    try:
+        for i in range(percobaan):
+            try:
+                r = requests.get(f"{BASE}/data", params={
+                    "id_wilayah": id_wilayah, "latitude": lat, "longitude": lon,
+                }, timeout=20)
+                j = r.json()
+            except (requests.RequestException, ValueError):
+                if i < percobaan - 1:
+                    time.sleep(0.5 * (i + 1))
+                    continue
+                return None
+
+            if j.get("status") == 200 and j.get("data"):
+                return j["data"]
+            if j.get("status") != 200 and i < percobaan - 1:
+                # status bukan 200 (mis. server lagi limit) — coba lagi, bukan langsung nyerah
                 time.sleep(0.5 * (i + 1))
                 continue
             return None
-
-        if j.get("status") == 200 and j.get("data"):
-            return j["data"]
-        if j.get("status") != 200 and i < percobaan - 1:
-            # status bukan 200 (mis. server lagi limit) — coba lagi, bukan langsung nyerah
-            time.sleep(0.5 * (i + 1))
-            continue
         return None
-    return None
+    finally:
+        time.sleep(JEDA_ANTAR_REQUEST)
 
 
 SPASI_SCAN_KASAR_M = 2000  # RDTR cuma nutup "kawasan perkotaan", bukan seluruh kabupaten —
@@ -290,11 +317,21 @@ def ambil_kota(entri: dict, spasi_m: float) -> None:
     print(f"▶  {nama_kota} ({id_wilayah}): kawasan RDTR ketemu, {len(titik)} titik grid halus @ {spasi_m:.0f}m ({PEKERJA} paralel)")
 
     hasil = []
+    legenda = {}  # hash -> isi "tbsktg" asli — field ini ~650KB dan IDENTIK untuk tiap
+                  # klasifikasi zona/sub-zona yang sama, jadi disimpan sekali per varian
+                  # (lihat isu ukuran file di STATUS.md) alih-alih diulang di tiap titik
     selesai = 0
     with ThreadPoolExecutor(max_workers=PEKERJA) as kolam:
         for (lat, lon), data in kolam.map(lambda t: (t, ambil_titik(id_wilayah, *t)), titik):
             selesai += 1
             if data:
+                tbsktg = data.pop("tbsktg", None)
+                if tbsktg is not None:
+                    kunci = hashlib.md5(
+                        json.dumps(tbsktg, sort_keys=True, ensure_ascii=False).encode("utf-8")
+                    ).hexdigest()[:12]
+                    legenda.setdefault(kunci, tbsktg)
+                    data["_tbsktg_ref"] = kunci
                 data["_lat"] = lat
                 data["_lon"] = lon
                 hasil.append(data)
@@ -306,8 +343,9 @@ def ambil_kota(entri: dict, spasi_m: float) -> None:
         berkas.write_text("[]", encoding="utf-8")
         return
 
-    berkas.write_text(json.dumps(hasil, ensure_ascii=False), encoding="utf-8")
-    print(f"✅ {nama_kota}: {len(hasil)}/{len(titik)} titik berisi zona → {berkas.relative_to(ROOT)}")
+    keluaran = {"legenda_tbsktg": legenda, "titik": hasil}
+    berkas.write_text(json.dumps(keluaran, ensure_ascii=False), encoding="utf-8")
+    print(f"✅ {nama_kota}: {len(hasil)}/{len(titik)} titik berisi zona ({len(legenda)} varian legenda) → {berkas.relative_to(ROOT)}")
 
 
 # ---------------------------------------------------------------- main
