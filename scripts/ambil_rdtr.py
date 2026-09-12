@@ -36,6 +36,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from shutil import which
 
@@ -67,7 +68,8 @@ OUT_DIR = ROOT / "data" / "raw" / "rdtr"
 GADM = ROOT / "data" / "raw" / "gadm41_indonesia.gpkg"
 
 BASE = "https://gistaru.atrbpn.go.id/rdtrinteraktif/api/interactive"
-JEDA_DETIK = 0.15  # jeda antar-request, sopan ke server ATR/BPN
+PEKERJA = 15  # request paralel — bottleneck-nya latensi jaringan (~1 detik/request),
+              # bukan CPU, jadi paralel motong waktu total ~15x tanpa nge-hajar server
 
 
 def cari_gdal() -> Path:
@@ -104,7 +106,7 @@ def bangun_katalog() -> None:
                 rdtr = requests.get(f"{BASE}/rdtr/{id_kota}", timeout=30).json()["data"]
             except (requests.RequestException, KeyError, ValueError):
                 continue
-            time.sleep(JEDA_DETIK)
+            time.sleep(0.15)  # katalog cuma dibangun sekali, gak perlu paralel
 
             for r in rdtr:
                 if r.get("status") == 6:  # 6 = RDTR sudah jadi produk hukum
@@ -210,11 +212,12 @@ def cari_area_rdtr(id_wilayah: str, bbox: tuple[float, float, float, float]) -> 
     titik_kasar = buat_grid(bbox, SPASI_SCAN_KASAR_M)
     lat_kena, lon_kena = [], []
 
-    for lat, lon in titik_kasar:
-        if ambil_titik(id_wilayah, lat, lon):
-            lat_kena.append(lat)
-            lon_kena.append(lon)
-        time.sleep(JEDA_DETIK)
+    with ThreadPoolExecutor(max_workers=PEKERJA) as kolam:
+        hasil = kolam.map(lambda t: (t, ambil_titik(id_wilayah, *t)), titik_kasar)
+        for (lat, lon), data in hasil:
+            if data:
+                lat_kena.append(lat)
+                lon_kena.append(lon)
 
     if not lat_kena:
         return None
@@ -252,18 +255,19 @@ def ambil_kota(entri: dict, spasi_m: float) -> None:
         return
 
     titik = buat_grid(bbox, spasi_m)
-    print(f"▶  {nama_kota} ({id_wilayah}): kawasan RDTR ketemu, {len(titik)} titik grid halus @ {spasi_m}m")
+    print(f"▶  {nama_kota} ({id_wilayah}): kawasan RDTR ketemu, {len(titik)} titik grid halus @ {spasi_m}m ({PEKERJA} paralel)")
 
     hasil = []
-    for i, (lat, lon) in enumerate(titik):
-        data = ambil_titik(id_wilayah, lat, lon)
-        if data:
-            data["_lat"] = lat
-            data["_lon"] = lon
-            hasil.append(data)
-        time.sleep(JEDA_DETIK)
-        if (i + 1) % 50 == 0:
-            print(f"   {i + 1}/{len(titik)} titik, {len(hasil)} berisi zona")
+    selesai = 0
+    with ThreadPoolExecutor(max_workers=PEKERJA) as kolam:
+        for (lat, lon), data in kolam.map(lambda t: (t, ambil_titik(id_wilayah, *t)), titik):
+            selesai += 1
+            if data:
+                data["_lat"] = lat
+                data["_lon"] = lon
+                hasil.append(data)
+            if selesai % 100 == 0:
+                print(f"   {selesai}/{len(titik)} titik, {len(hasil)} berisi zona")
 
     if not hasil:
         print(f"⏭️  {nama_kota}: tidak ada titik yang berisi data zona (mungkin grid meleset dari kawasan RDTR)")
