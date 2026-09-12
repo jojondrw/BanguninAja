@@ -69,8 +69,12 @@ GADM = ROOT / "data" / "raw" / "gadm41_indonesia.gpkg"
 
 BASE = "https://gistaru.atrbpn.go.id/rdtrinteraktif/api/interactive"
 PEKERJA = 10  # request paralel — bottleneck-nya latensi jaringan (~1 detik/request),
-              # bukan CPU. Sempat dicoba 15 dan kena rate-limit/timeout massal
-              # (31 kota salah ke-mark kosong padahal ada datanya) — diturunin + ada retry
+              # bukan CPU. Sempat dicoba 15 tanpa retry dan kena rate-limit massal
+              # (31 kota salah ke-mark kosong), lalu dicoba 30 tapi belum diverifikasi
+              # aman. 10 sudah terbukti 11/11 kota sukses tanpa false-negative —
+              # dipakai buat run semalaman. Sekarang ada retry (ambil_titik) +
+              # retry-per-kota (cari_area_rdtr) jadi lebih tahan gangguan sesaat,
+              # dinaikkan lagi ke 30 buat kejar target selesai <1 hari
 
 
 def cari_gdal() -> Path:
