@@ -50,6 +50,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -95,6 +96,42 @@ BASE = "https://gistaru.atrbpn.go.id/rdtrinteraktif/api/interactive"
 # konservatif daripada ngoyo ngejar ETA, biar gak bikin ulang.
 PEKERJA = 3          # paralel rendah, sengaja jauh di bawah kapasitas jaringan kita
 JEDA_ANTAR_REQUEST = 0.4  # detik, jeda per worker SETELAH tiap request (sukses/gagal)
+
+# --- Circuit breaker ------------------------------------------------------
+# Post-mortem 2026-09-13 (ronde 2): pas server /data lagi down total, retry
+# per-titik + retry per-kota tetap bikin tiap kota akhirnya "nihil" dan
+# ke-tulis sebagai [] — itu SALAH, itu bukan kota kosong, itu server mati.
+# Kalau dibiarin jalan --semua bakal nulis [] palsu ke ratusan kota beruntun.
+# Solusi: bedain "server jawab (walau titiknya emang kosong)" dari "request
+# betul-betul gagal" (exception/non-200 sampai retry habis). Kalau kegagalan
+# jenis kedua ini kejadian beruntun tanpa diselingi sukses, itu tanda server
+# down buat semua orang — hentikan SELURUH run drpd terus nulis file kosong.
+KEGAGALAN_BERUNTUN_MAKS = 40
+_kegagalan_lock = threading.Lock()
+_kegagalan_beruntun = 0
+
+
+class ServerBermasalah(Exception):
+    """Server /data kemungkinan down — kegagalan request beruntun kelewat banyak,
+    ini BUKAN sinyal area yang genuinely kosong."""
+
+
+def _catat_sukses_server() -> None:
+    global _kegagalan_beruntun
+    with _kegagalan_lock:
+        _kegagalan_beruntun = 0
+
+
+def _catat_kegagalan_server() -> None:
+    global _kegagalan_beruntun
+    with _kegagalan_lock:
+        _kegagalan_beruntun += 1
+        gagal = _kegagalan_beruntun
+    if gagal >= KEGAGALAN_BERUNTUN_MAKS:
+        raise ServerBermasalah(
+            f"{gagal} request beruntun gagal (error/timeout, BUKAN respons kosong yang valid) — "
+            "kemungkinan besar server ATR/BPN lagi down, bukan area yang genuinely kosong."
+        )
 
 
 def cari_gdal() -> Path:
@@ -232,14 +269,19 @@ def ambil_titik(id_wilayah: str, lat: float, lon: float, percobaan: int = 3) -> 
                 if i < percobaan - 1:
                     time.sleep(0.5 * (i + 1))
                     continue
+                _catat_kegagalan_server()
                 return None
 
-            if j.get("status") == 200 and j.get("data"):
-                return j["data"]
-            if j.get("status") != 200 and i < percobaan - 1:
+            if j.get("status") == 200:
+                # Server benar-benar jawab — walau data-nya kosong (titik ini
+                # emang di luar kawasan RDTR), itu BUKAN kegagalan.
+                _catat_sukses_server()
+                return j["data"] if j.get("data") else None
+            if i < percobaan - 1:
                 # status bukan 200 (mis. server lagi limit) — coba lagi, bukan langsung nyerah
                 time.sleep(0.5 * (i + 1))
                 continue
+            _catat_kegagalan_server()
             return None
         return None
     finally:
@@ -369,15 +411,27 @@ def main() -> None:
         cocok = [k for k in katalog if args.kota.lower() in k["kota"].lower()]
         if not cocok:
             sys.exit(f"❌ '{args.kota}' tidak ketemu di katalog ({len(katalog)} entri tersedia).")
-        for entri in cocok:
-            ambil_kota(entri, args.spasi)
+        try:
+            for entri in cocok:
+                ambil_kota(entri, args.spasi)
+        except ServerBermasalah as e:
+            sys.exit(f"\n🛑 BERHENTI: {e}\n   Cek dulu endpoint-nya sehat, baru jalankan ulang (resume-safe, gak nulis ulang yang sudah selesai).")
         return
 
     if args.semua:
         print(f"Menarik SEMUA {len(katalog)} kota di katalog, spasi grid {args.spasi}m.")
         print("Ini akan memakan waktu lama — biarkan berjalan, jangan dihentikan di tengah.\n")
-        for entri in katalog:
-            ambil_kota(entri, args.spasi)
+        try:
+            for entri in katalog:
+                ambil_kota(entri, args.spasi)
+        except ServerBermasalah as e:
+            sys.exit(
+                f"\n🛑 BERHENTI TOTAL, tidak lanjut ke kota-kota berikutnya: {e}\n"
+                "   Ini BUKAN berarti kota-kota sisanya kosong — jangan diinterpretasikan begitu.\n"
+                "   Tidak ada file [] palsu yang ditulis buat kota yang lagi diproses saat berhenti.\n"
+                "   Cek dulu endpoint-nya sehat (curl manual), baru jalankan ulang --semua lagi —\n"
+                "   resume-safe, otomatis lanjut dari kota yang belum ada filenya."
+            )
         return
 
     print(__doc__)
