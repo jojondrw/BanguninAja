@@ -68,8 +68,9 @@ OUT_DIR = ROOT / "data" / "raw" / "rdtr"
 GADM = ROOT / "data" / "raw" / "gadm41_indonesia.gpkg"
 
 BASE = "https://gistaru.atrbpn.go.id/rdtrinteraktif/api/interactive"
-PEKERJA = 15  # request paralel — bottleneck-nya latensi jaringan (~1 detik/request),
-              # bukan CPU, jadi paralel motong waktu total ~15x tanpa nge-hajar server
+PEKERJA = 10  # request paralel — bottleneck-nya latensi jaringan (~1 detik/request),
+              # bukan CPU. Sempat dicoba 15 dan kena rate-limit/timeout massal
+              # (31 kota salah ke-mark kosong padahal ada datanya) — diturunin + ada retry
 
 
 def cari_gdal() -> Path:
@@ -189,18 +190,29 @@ def buat_grid(bbox: tuple[float, float, float, float], spasi_m: float) -> list[t
 # ---------------------------------------------------------------- ambil
 
 
-def ambil_titik(id_wilayah: str, lat: float, lon: float) -> dict | None:
-    try:
-        r = requests.get(f"{BASE}/data", params={
-            "id_wilayah": id_wilayah, "latitude": lat, "longitude": lon,
-        }, timeout=20)
-        j = r.json()
-    except (requests.RequestException, ValueError):
-        return None
+def ambil_titik(id_wilayah: str, lat: float, lon: float, percobaan: int = 3) -> dict | None:
+    """Query satu titik. Retry beberapa kali — server ATR/BPN kadang timeout/rate-limit
+    sesaat pas dihajar banyak request paralel, gagal sekali bukan berarti genuinely kosong."""
+    for i in range(percobaan):
+        try:
+            r = requests.get(f"{BASE}/data", params={
+                "id_wilayah": id_wilayah, "latitude": lat, "longitude": lon,
+            }, timeout=20)
+            j = r.json()
+        except (requests.RequestException, ValueError):
+            if i < percobaan - 1:
+                time.sleep(0.5 * (i + 1))
+                continue
+            return None
 
-    if j.get("status") != 200 or not j.get("data"):
+        if j.get("status") == 200 and j.get("data"):
+            return j["data"]
+        if j.get("status") != 200 and i < percobaan - 1:
+            # status bukan 200 (mis. server lagi limit) — coba lagi, bukan langsung nyerah
+            time.sleep(0.5 * (i + 1))
+            continue
         return None
-    return j["data"]
+    return None
 
 
 SPASI_SCAN_KASAR_M = 2000  # RDTR cuma nutup "kawasan perkotaan", bukan seluruh kabupaten —
@@ -250,7 +262,11 @@ def ambil_kota(entri: dict, spasi_m: float) -> None:
     print(f"🔍 {nama_kota}: scan kasar dulu (spasi {SPASI_SCAN_KASAR_M}m) buat nemuin kawasan RDTR...")
     bbox = cari_area_rdtr(id_wilayah, bbox_kab)
     if bbox is None:
-        print(f"⏭️  {nama_kota}: scan kasar nihil — kawasan RDTR-nya kelewat kecil buat spasi {SPASI_SCAN_KASAR_M}m, atau id_wilayah salah")
+        print(f"   nihil di percobaan pertama, tunggu 5 detik lalu coba sekali lagi (jaga-jaga gangguan sesaat)...")
+        time.sleep(5)
+        bbox = cari_area_rdtr(id_wilayah, bbox_kab)
+    if bbox is None:
+        print(f"⏭️  {nama_kota}: scan kasar nihil 2x — kawasan RDTR-nya kelewat kecil buat spasi {SPASI_SCAN_KASAR_M}m, atau id_wilayah salah")
         berkas.write_text("[]", encoding="utf-8")
         return
 
